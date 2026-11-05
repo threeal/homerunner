@@ -2,11 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Template notice:** This file describes the template repository itself. In a project derived from this template, tell the user it should be replaced with project-specific guidance.
-
 ## About This Repository
 
-A minimal Rust library and CLI starter template. Its only application code is a placeholder Fibonacci implementation in `src/` — real logic is added by projects derived from it.
+homerunner is a Rust library and CLI for deploying and managing persistent self-hosted GitHub Actions runners in Docker, on Linux only. It isn't implemented yet: `src/` holds only a placeholder `status` function and a CLI that prints it.
 
 ## Gotchas
 
