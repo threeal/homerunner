@@ -2,7 +2,19 @@
 
 A CLI for deploying and managing persistent [self-hosted GitHub Actions runners](https://docs.github.com/en/actions/hosting-your-own-runners) in [Docker](https://www.docker.com/), on Linux only. Register a runner once with a token and leave it running, keep its build cache warm across jobs, and scale to more instances with one command.
 
-This project is at an early stage: the toolkit isn't implemented yet, and its CLI only prints a placeholder notice.
+This project is at an early stage: for now, it can only add runners.
+
+## Usage
+
+homerunner calls `docker` as the current user, so that user needs access to the Docker daemon.
+
+To add a runner, open the repository's "New self-hosted runner" page under Settings → Actions → Runners, copy the registration token shown there, and run:
+
+```sh
+homerunner add https://github.com/<owner>/<repo> --token <TOKEN>
+```
+
+The runner is named `<repo>-<N>`, using the lowest number not already taken, and runs in a Docker container of the same name that restarts unless stopped. Its home directory, including the build state in `_work`, lives in a Docker volume of the same name. Each registration token works once, so adding another runner takes a fresh one.
 
 ## Setup
 

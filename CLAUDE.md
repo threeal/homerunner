@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## About This Repository
 
-homerunner is a Rust library and CLI for deploying and managing persistent self-hosted GitHub Actions runners in Docker, on Linux only. It isn't implemented yet: `src/` holds only a placeholder `status` function and a CLI that prints it.
+homerunner is a Rust library and CLI for deploying and managing persistent self-hosted GitHub Actions runners in Docker, on Linux only. For now, its only command is `homerunner add`, which registers a runner and starts it in a container backed by its own volume.
+
+Code that only calls `docker` is marked `#[cfg(not(tarpaulin_include))]` to exclude it from coverage; don't mock Docker to test it.
 
 ## Gotchas
 
