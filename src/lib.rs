@@ -12,7 +12,8 @@ const IMAGE: &str = "ghcr.io/actions/actions-runner:latest";
 ///
 /// The runner is named `<repo>-<N>`, using the lowest `N` not already taken by
 /// a Docker volume. Its volume of the same name holds the runner's home
-/// directory, and its container of the same name restarts unless stopped.
+/// directory, and its container of the same name restarts unless stopped,
+/// refreshing the apt package index each time it starts.
 /// If any step before starting the container fails, the container and volume
 /// created so far are removed.
 ///
@@ -61,7 +62,9 @@ fn create_and_register(name: &str, url: &str, token: &str) -> Result<(), String>
         "--volume",
         &volume,
         IMAGE,
-        "./run.sh",
+        "bash",
+        "-c",
+        "sudo apt-get update; exec ./run.sh",
     ])
     .map_err(|err| format!("failed to create the runner container: {err}"))?;
 
