@@ -1,10 +1,8 @@
-# Rust Starter
+# homerunner
 
-A minimal template for building a [Rust](https://www.rust-lang.org/) library with an optional CLI. Ships pre-configured with formatting, linting, 100% test coverage enforcement, pre-commit hooks, and CI.
+A CLI for deploying and managing persistent [self-hosted GitHub Actions runners](https://docs.github.com/en/actions/hosting-your-own-runners) in [Docker](https://www.docker.com/), on Linux only. Register a runner once with a token and leave it running, keep its build cache warm across jobs, and scale to more instances with one command.
 
-## Getting Started
-
-Create a new repository from this template on GitHub using [this link](https://github.com/new?template_name=rust-starter&template_owner=threeal), or clone it locally and point it at your own remote.
+This project is at an early stage: the toolkit isn't implemented yet, and its CLI only prints a placeholder notice.
 
 ## Setup
 
@@ -25,17 +23,6 @@ Install [Lefthook](https://lefthook.dev/) and [dprint](https://dprint.dev/), the
 ```sh
 lefthook install
 ```
-
-## Customizing
-
-Replace or extend the template files to fit your project:
-
-- **`src/lib.rs`** — Replace with your own library logic.
-- **`src/main.rs`** — Replace or remove the placeholder CLI. Remove this file and the `clap` dependency if your project doesn't need a CLI.
-- **`Cargo.toml`** — Update the package name, description, version, authors, and other metadata.
-- **`CLAUDE.md`** — Replace with guidance specific to your project.
-- **`LICENSE`** — Replace with your preferred license, or keep the [Unlicense](https://unlicense.org/).
-- **`README.md`** — Replace with a description of your project.
 
 ## Development
 
