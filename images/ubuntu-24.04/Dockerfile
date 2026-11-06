@@ -10,15 +10,27 @@ ENV RUNNER_MANUALLY_TRAP_SIG=1
 ENV ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
 ENV ImageOS=ubuntu24
 
+# As on GitHub-hosted runners, pipx installs apps outside the home directory,
+# with their commands on the PATH.
+ENV PIPX_HOME=/opt/pipx
+ENV PIPX_BIN_DIR=/opt/pipx_bin
+ENV PATH=/opt/pipx_bin:$PATH
+
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl git sudo \
     && rm -rf /var/lib/apt/lists/*
 
+# Tools preinstalled on GitHub-hosted Ubuntu runners.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends clang clang-format cmake ninja-build pipx \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN useradd --create-home --uid 1001 runner \
     && printf '%s\n' 'runner ALL=(ALL) NOPASSWD:ALL' 'Defaults env_keep += "DEBIAN_FRONTEND"' > /etc/sudoers.d/runner \
-    && chmod 0440 /etc/sudoers.d/runner
+    && chmod 0440 /etc/sudoers.d/runner \
+    && install -d -o runner -g runner "$PIPX_HOME" "$PIPX_BIN_DIR"
 
 WORKDIR /home/runner
 
