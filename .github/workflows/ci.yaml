@@ -34,3 +34,6 @@ jobs:
 
       - name: Package
         run: cargo package
+
+      - name: Build images
+        run: docker buildx bake
