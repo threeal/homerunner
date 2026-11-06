@@ -16,7 +16,7 @@ homerunner add https://github.com/<owner>/<repo> --token <TOKEN>
 
 The runner is named `<repo>-<N>`, using the lowest number not already taken, and runs in a Docker container of the same name that restarts unless stopped. Its home directory, including the build state in `_work`, lives in a Docker volume of the same name. Each registration token works once, so adding another runner takes a fresh one.
 
-The container refreshes the apt package index whenever it starts, so workflows can run `sudo apt-get install` without `apt-get update` first, as on GitHub-hosted runners.
+The container runs homerunner's own Ubuntu 24.04 image, `ghcr.io/threeal/homerunner:ubuntu-24.04`, which ships the runner and the user it runs as, with passwordless sudo. The container refreshes the apt package index whenever it starts, so workflows can run `sudo apt-get install` without `apt-get update` first, as on GitHub-hosted runners.
 
 ## Setup
 

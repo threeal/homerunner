@@ -4,8 +4,8 @@
 use std::collections::HashSet;
 use std::process::Command;
 
-/// The image every runner container runs, which already ships the runner.
-const IMAGE: &str = "ghcr.io/actions/actions-runner:latest";
+/// The image every runner container runs, built from `images/ubuntu-24.04`.
+const IMAGE: &str = "ghcr.io/threeal/homerunner:ubuntu-24.04";
 
 /// Registers a new self-hosted runner for the repository at `url` and starts
 /// it, returning the runner's name.
