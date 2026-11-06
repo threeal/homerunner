@@ -1,5 +1,6 @@
 FROM ubuntu:24.04
 
+LABEL org.opencontainers.image.description="Ubuntu 24.04 image for self-hosted GitHub Actions runners deployed by homerunner"
 LABEL org.opencontainers.image.source=https://github.com/threeal/homerunner
 
 ARG RUNNER_VERSION=2.338.2
