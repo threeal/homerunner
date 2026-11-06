@@ -25,7 +25,7 @@ fn main() {
             let token = matches
                 .get_one::<String>("token")
                 .expect("token is required");
-            homerunner::add(url, token).map(|name| println!("Added runner {name}"))
+            homerunner::add(url, token).map(|name| println!("added runner {name}"))
         }
         _ => unreachable!("a subcommand is required"),
     };

@@ -14,6 +14,7 @@ const IMAGE: &str = "ghcr.io/actions/actions-runner:latest";
 /// a Docker volume. Its volume of the same name holds the runner's home
 /// directory, and its container of the same name restarts unless stopped,
 /// refreshing the apt package index each time it starts.
+/// Each step prints a line to standard output before it runs.
 /// If any step before starting the container fails, the container and volume
 /// created so far are removed.
 ///
@@ -28,6 +29,7 @@ pub fn add(url: &str, token: &str) -> Result<String, String> {
         .map_err(|err| format!("failed to list volumes: {err}"))?;
     let name = next_runner_name(repo, volumes.lines());
 
+    println!("creating volume {name}");
     docker(&[
         "volume",
         "create",
@@ -38,11 +40,13 @@ pub fn add(url: &str, token: &str) -> Result<String, String> {
     .map_err(|err| format!("failed to create the runner volume: {err}"))?;
 
     if let Err(err) = create_and_register(&name, url, token) {
+        println!("removing container and volume {name}");
         let _ = docker(&["rm", "--force", &name]);
         let _ = docker(&["volume", "rm", &name]);
         return Err(err);
     }
 
+    println!("starting container {name}");
     docker(&["start", &name]).map_err(|err| format!("failed to start the runner: {err}"))?;
     Ok(name)
 }
@@ -53,6 +57,7 @@ pub fn add(url: &str, token: &str) -> Result<String, String> {
 fn create_and_register(name: &str, url: &str, token: &str) -> Result<(), String> {
     let volume = format!("{name}:/home/runner");
 
+    println!("creating container {name}");
     docker(&[
         "create",
         "--name",
@@ -68,6 +73,7 @@ fn create_and_register(name: &str, url: &str, token: &str) -> Result<(), String>
     ])
     .map_err(|err| format!("failed to create the runner container: {err}"))?;
 
+    println!("registering runner {name} to {url}");
     docker(&[
         "run",
         "--rm",
