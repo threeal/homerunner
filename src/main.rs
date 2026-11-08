@@ -17,6 +17,10 @@ fn main() {
                         .required(true),
                 ),
         )
+        .subcommand(
+            clap::Command::new("list")
+                .about("List the runners, with their repositories and container states"),
+        )
         .get_matches();
 
     let result = match matches.subcommand() {
@@ -26,6 +30,9 @@ fn main() {
                 .get_one::<String>("token")
                 .expect("token is required");
             homerunner::add(url, token).map(|name| println!("added runner {name}"))
+        }
+        Some(("list", _)) => {
+            homerunner::list().map(|runners| print!("{}", homerunner::format_runners(&runners)))
         }
         _ => unreachable!("a subcommand is required"),
     };
