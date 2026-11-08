@@ -133,23 +133,7 @@ pub fn add(url: &str, token: &str) -> Result<String, String> {
 /// registers the runner with GitHub in a throwaway container.
 #[cfg(not(tarpaulin_include))]
 fn create_and_register(name: &str, url: &str, token: &str) -> Result<(), String> {
-    let volume = format!("{name}:/home/runner");
-
-    println!("creating container {name}");
-    docker(&[
-        "create",
-        "--name",
-        name,
-        "--restart",
-        "unless-stopped",
-        "--volume",
-        &volume,
-        IMAGE,
-        "bash",
-        "-c",
-        "sudo apt-get update; exec ./run.sh",
-    ])
-    .map_err(|err| format!("failed to create the runner container: {err}"))?;
+    create_container(name)?;
 
     println!("registering runner {name} to {url}");
     docker(&[
@@ -158,7 +142,7 @@ fn create_and_register(name: &str, url: &str, token: &str) -> Result<(), String>
         "--env",
         "ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=",
         "--volume",
-        &volume,
+        &format!("{name}:/home/runner"),
         IMAGE,
         "./config.sh",
         "--unattended",
@@ -171,6 +155,84 @@ fn create_and_register(name: &str, url: &str, token: &str) -> Result<(), String>
     ])
     .map_err(|err| format!("failed to register the runner: {err}"))?;
 
+    Ok(())
+}
+
+/// Updates every runner, or only the runner `name` if given, to the latest
+/// image, returning the names of the runners updated.
+///
+/// The image is pulled first. Each runner whose container already runs it is
+/// left untouched. Any other runner has its container stopped, letting the
+/// runner end its session with GitHub, then removed, and recreated and started
+/// on the same volume. A runner without a container gets a new one.
+/// Each step prints a line to standard output before it runs.
+///
+/// # Errors
+///
+/// Returns an error if there's no runner named `name`, or if any `docker` call
+/// fails.
+#[cfg(not(tarpaulin_include))]
+pub fn update(name: Option<&str>) -> Result<Vec<String>, String> {
+    let mut runners = list()?;
+    if let Some(name) = name {
+        runners.retain(|runner| runner.name == name);
+        if runners.is_empty() {
+            return Err(format!("no runner named {name}"));
+        }
+    }
+
+    println!("pulling image {IMAGE}");
+    docker(&["pull", "--quiet", IMAGE])
+        .map_err(|err| format!("failed to pull the image: {err}"))?;
+    let image = docker(&["image", "inspect", "--format", "{{.Id}}", IMAGE])
+        .map_err(|err| format!("failed to inspect the image: {err}"))?;
+
+    let mut updated = Vec::new();
+    for Runner { name, state, .. } in runners {
+        if state != "missing" {
+            let current = docker(&["container", "inspect", "--format", "{{.Image}}", &name])
+                .map_err(|err| format!("failed to inspect the runner container: {err}"))?;
+            if current.trim() == image.trim() {
+                println!("runner {name} is up to date");
+                continue;
+            }
+
+            println!("stopping container {name}");
+            docker(&["stop", &name]).map_err(|err| format!("failed to stop the runner: {err}"))?;
+
+            println!("removing container {name}");
+            docker(&["rm", &name])
+                .map_err(|err| format!("failed to remove the runner container: {err}"))?;
+        }
+
+        create_container(&name)?;
+
+        println!("starting container {name}");
+        docker(&["start", &name]).map_err(|err| format!("failed to start the runner: {err}"))?;
+        updated.push(name);
+    }
+    Ok(updated)
+}
+
+/// Creates the container of the runner `name` on its volume, without starting
+/// it.
+#[cfg(not(tarpaulin_include))]
+fn create_container(name: &str) -> Result<(), String> {
+    println!("creating container {name}");
+    docker(&[
+        "create",
+        "--name",
+        name,
+        "--restart",
+        "unless-stopped",
+        "--volume",
+        &format!("{name}:/home/runner"),
+        IMAGE,
+        "bash",
+        "-c",
+        "sudo apt-get update; exec ./run.sh",
+    ])
+    .map_err(|err| format!("failed to create the runner container: {err}"))?;
     Ok(())
 }
 

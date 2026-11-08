@@ -21,6 +21,11 @@ fn main() {
             clap::Command::new("list")
                 .about("List the runners, with their repositories and container states"),
         )
+        .subcommand(
+            clap::Command::new("update")
+                .about("Update the runners, or only the one named, to the latest image")
+                .arg(clap::arg!([NAME] "The name of the runner")),
+        )
         .get_matches();
 
     let result = match matches.subcommand() {
@@ -33,6 +38,14 @@ fn main() {
         }
         Some(("list", _)) => {
             homerunner::list().map(|runners| print!("{}", homerunner::format_runners(&runners)))
+        }
+        Some(("update", matches)) => {
+            let name = matches.get_one::<String>("NAME").map(String::as_str);
+            homerunner::update(name).map(|names| {
+                for name in names {
+                    println!("updated runner {name}");
+                }
+            })
         }
         _ => unreachable!("a subcommand is required"),
     };

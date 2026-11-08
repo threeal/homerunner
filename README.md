@@ -2,7 +2,7 @@
 
 A CLI for deploying and managing persistent [self-hosted GitHub Actions runners](https://docs.github.com/en/actions/hosting-your-own-runners) in [Docker](https://www.docker.com/), on Linux only. Register a runner once with a token and leave it running, keep its build cache warm across jobs, and scale to more instances with one command.
 
-This project is at an early stage: for now, it can only add and list runners.
+This project is at an early stage: for now, it can only add, list, and update runners.
 
 ## Usage
 
@@ -23,6 +23,14 @@ To list the runners homerunner manages, with the repository each is registered t
 ```sh
 homerunner list
 ```
+
+Each push to homerunner's `main` branch publishes a new image, but a runner keeps the image its container was created from. To move every runner onto the latest image, or only the runner `<NAME>` if given, run:
+
+```sh
+homerunner update [<NAME>]
+```
+
+It pulls the image, then stops, recreates, and starts the container of each runner not on it yet, keeping its volume and registration, so it needs no token. Stopping a container cancels any job its runner is running.
 
 ## Setup
 
