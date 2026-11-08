@@ -1,3 +1,15 @@
+FROM scratch AS cmake
+
+ARG CMAKE_VERSION=3.31.6
+
+ADD "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz" /cmake.tar.gz
+
+FROM scratch AS ninja
+
+ARG NINJA_VERSION=1.13.2
+
+ADD "https://github.com/ninja-build/ninja/releases/download/v${NINJA_VERSION}/ninja-linux.zip" /ninja.zip
+
 FROM ubuntu:24.04
 
 LABEL org.opencontainers.image.description="Ubuntu 24.04 image for self-hosted GitHub Actions runners deployed by homerunner"
@@ -22,10 +34,20 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl git sudo \
     && rm -rf /var/lib/apt/lists/*
 
-# Tools preinstalled on GitHub-hosted Ubuntu runners.
+# Tools preinstalled on GitHub-hosted Ubuntu runners, each installed from the
+# same source and at the same version as there.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends clang clang-format cmake ninja-build pipx \
+    && apt-get install -y --no-install-recommends clang clang-format python3 python3-pip python3-venv unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# pipx is pinned to the last version that works with the packaging library
+# Ubuntu 24.04 ships, and pip may install into the system Python.
+RUN printf '%s\n' '[global]' 'break-system-packages = true' > /etc/pip.conf \
+    && python3 -m pip install --no-cache-dir pipx==1.16.7
+
+RUN --mount=from=cmake,target=/mnt/cmake tar -xzf /mnt/cmake/cmake.tar.gz -C /usr/local --strip-components=1
+
+RUN --mount=from=ninja,target=/mnt/ninja unzip -q /mnt/ninja/ninja.zip -d /usr/local/bin
 
 RUN useradd --create-home --uid 1001 runner \
     && printf '%s\n' 'runner ALL=(ALL) NOPASSWD:ALL' 'Defaults env_keep += "DEBIAN_FRONTEND"' > /etc/sudoers.d/runner \
