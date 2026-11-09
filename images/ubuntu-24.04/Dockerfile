@@ -24,6 +24,9 @@ LABEL org.opencontainers.image.source=https://github.com/threeal/homerunner
 ARG RUNNER_VERSION=2.338.2
 ARG RUST_VERSION=1.99.1
 
+# Exposed to each step so Python compiles bytecode without timestamps.
+ARG SOURCE_DATE_EPOCH
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV RUNNER_MANUALLY_TRAP_SIG=1
 ENV ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
@@ -43,15 +46,17 @@ ENV PATH=/opt/cargo/bin:$PATH
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# Each step removes the logs and caches that record when it ran, so rebuilding
+# from the same inputs gives the same image.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl git sudo \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* /var/log/apt/* /var/log/alternatives.log /var/log/dpkg.log /var/cache/ldconfig/aux-cache
 
 # Tools preinstalled on GitHub-hosted Ubuntu runners, each installed from the
 # same source and at the same version as there.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends clang clang-format python3 python3-pip python3-venv unzip \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* /var/log/apt/* /var/log/alternatives.log /var/log/dpkg.log /var/cache/ldconfig/aux-cache
 
 # pipx is pinned to the last version that works with the packaging library
 # Ubuntu 24.04 ships, and pip may install into the system Python.
@@ -82,7 +87,7 @@ WORKDIR /home/runner
 # seeded from it once and never picks up later changes to the image.
 RUN curl -fsSL "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" | tar -xz \
     && ./bin/installdependencies.sh \
-    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/lib/apt/lists/* /var/log/apt/* /var/log/alternatives.log /var/log/dpkg.log /var/cache/ldconfig/aux-cache \
     && chown -R runner:runner /home/runner
 
 USER runner

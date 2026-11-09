@@ -22,4 +22,4 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy images
-        run: docker buildx bake --push
+        run: docker buildx bake --set '*.output=type=registry,rewrite-timestamp=true'
