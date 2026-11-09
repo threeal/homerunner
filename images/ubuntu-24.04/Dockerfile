@@ -10,12 +10,19 @@ ARG NINJA_VERSION=1.13.2
 
 ADD "https://github.com/ninja-build/ninja/releases/download/v${NINJA_VERSION}/ninja-linux.zip" /ninja.zip
 
+FROM scratch AS rustup
+
+ARG RUSTUP_VERSION=1.29.3
+
+ADD --chmod=755 "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/x86_64-unknown-linux-gnu/rustup-init" /rustup-init
+
 FROM ubuntu:24.04
 
 LABEL org.opencontainers.image.description="Ubuntu 24.04 image for self-hosted GitHub Actions runners deployed by homerunner"
 LABEL org.opencontainers.image.source=https://github.com/threeal/homerunner
 
 ARG RUNNER_VERSION=2.338.2
+ARG RUST_VERSION=1.99.1
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV RUNNER_MANUALLY_TRAP_SIG=1
@@ -27,6 +34,12 @@ ENV ImageOS=ubuntu24
 ENV PIPX_HOME=/opt/pipx
 ENV PIPX_BIN_DIR=/opt/pipx_bin
 ENV PATH=/opt/pipx_bin:$PATH
+
+# Unlike on GitHub-hosted runners, rustup and Cargo live outside the home
+# directory, which only ever holds the runner, with their commands on the PATH.
+ENV RUSTUP_HOME=/opt/rustup
+ENV CARGO_HOME=/opt/cargo
+ENV PATH=/opt/cargo/bin:$PATH
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -52,7 +65,16 @@ RUN --mount=from=ninja,target=/mnt/ninja unzip -q /mnt/ninja/ninja.zip -d /usr/l
 RUN useradd --create-home --uid 1001 runner \
     && printf '%s\n' 'runner ALL=(ALL) NOPASSWD:ALL' 'Defaults env_keep += "DEBIAN_FRONTEND"' > /etc/sudoers.d/runner \
     && chmod 0440 /etc/sudoers.d/runner \
-    && install -d -o runner -g runner "$PIPX_HOME" "$PIPX_BIN_DIR"
+    && install -d -o runner -g runner "$PIPX_HOME" "$PIPX_BIN_DIR" "$RUSTUP_HOME" "$CARGO_HOME"
+
+# Rust is installed as the runner user, so jobs can add toolchains and
+# components without sudo.
+USER runner
+
+RUN --mount=from=rustup,target=/mnt/rustup /mnt/rustup/rustup-init -y --no-modify-path --profile=minimal --default-toolchain="${RUST_VERSION}" --component=rustfmt,clippy \
+    && rm -rf "${CARGO_HOME}/registry"
+
+USER root
 
 WORKDIR /home/runner
 
