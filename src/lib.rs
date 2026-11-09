@@ -158,6 +158,41 @@ fn create_and_register(name: &str, url: &str, token: &str) -> Result<(), String>
     Ok(())
 }
 
+/// Removes the runner `name` from this host.
+///
+/// The runner's container is stopped, letting the runner end its session with
+/// GitHub, then removed, followed by its volume, which holds its registration
+/// and build state. A runner without a container just has its volume removed.
+/// The runner stays registered on GitHub, where it shows as offline until it's
+/// removed from the repository's runner settings.
+/// Each step prints a line to standard output before it runs.
+///
+/// # Errors
+///
+/// Returns an error if there's no runner named `name`, or if any `docker` call
+/// fails.
+#[cfg(not(tarpaulin_include))]
+pub fn remove(name: &str) -> Result<(), String> {
+    let runner = list()?
+        .into_iter()
+        .find(|runner| runner.name == name)
+        .ok_or_else(|| format!("no runner named {name}"))?;
+
+    if runner.state != "missing" {
+        println!("stopping container {name}");
+        docker(&["stop", name]).map_err(|err| format!("failed to stop the runner: {err}"))?;
+
+        println!("removing container {name}");
+        docker(&["rm", name])
+            .map_err(|err| format!("failed to remove the runner container: {err}"))?;
+    }
+
+    println!("removing volume {name}");
+    docker(&["volume", "rm", name])
+        .map_err(|err| format!("failed to remove the runner volume: {err}"))?;
+    Ok(())
+}
+
 /// Updates every runner, or only the runner `name` if given, to the latest
 /// image, returning the names of the runners updated.
 ///

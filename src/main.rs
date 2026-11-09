@@ -22,6 +22,11 @@ fn main() {
                 .about("List the runners, with their repositories and container states"),
         )
         .subcommand(
+            clap::Command::new("remove")
+                .about("Stop a runner and remove its container and volume")
+                .arg(clap::arg!(<NAME> "The name of the runner")),
+        )
+        .subcommand(
             clap::Command::new("update")
                 .about("Update the runners, or only the one named, to the latest image")
                 .arg(clap::arg!([NAME] "The name of the runner")),
@@ -38,6 +43,10 @@ fn main() {
         }
         Some(("list", _)) => {
             homerunner::list().map(|runners| print!("{}", homerunner::format_runners(&runners)))
+        }
+        Some(("remove", matches)) => {
+            let name = matches.get_one::<String>("NAME").expect("NAME is required");
+            homerunner::remove(name).map(|()| println!("removed runner {name}"))
         }
         Some(("update", matches)) => {
             let name = matches.get_one::<String>("NAME").map(String::as_str);
