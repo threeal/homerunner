@@ -2,7 +2,7 @@
 
 A CLI for deploying and managing persistent [self-hosted GitHub Actions runners](https://docs.github.com/en/actions/hosting-your-own-runners) in [Docker](https://www.docker.com/), on Linux only. Register a runner once with a token and leave it running, keep its build cache warm across jobs, and scale to more instances with one command.
 
-This project is at an early stage: for now, it can only add, list, and update runners.
+This project is at an early stage: for now, it can only add, list, update, and remove runners.
 
 ## Usage
 
@@ -31,6 +31,14 @@ homerunner update [<NAME>]
 ```
 
 It pulls the image, then stops, recreates, and starts the container of each runner not on it yet, keeping its volume and registration, so it needs no token. Stopping a container cancels any job its runner is running.
+
+To remove the runner `<NAME>` from the host, run:
+
+```sh
+homerunner remove <NAME>
+```
+
+It stops the runner's container, then removes the container and the volume, along with the runner's build state. The runner stays registered on GitHub, showing as offline, until you remove it from the repository's runner settings.
 
 ## Setup
 
