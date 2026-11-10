@@ -24,7 +24,7 @@ To list the runners homerunner manages, with the repository each is registered t
 homerunner list
 ```
 
-Each change to the image on homerunner's `main` branch publishes a new one, but a runner keeps the image its container was created from. To move every runner onto the latest image, or only the runner `<NAME>` if given, run:
+homerunner publishes a new image whenever its `main` branch changes the image, and every week to pick up package updates, but a runner keeps the image its container was created from. To move every runner onto the latest image, or only the runner `<NAME>` if given, run:
 
 ```sh
 homerunner update [<NAME>]
