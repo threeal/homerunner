@@ -90,8 +90,7 @@ pub fn format_runners(runners: &[Runner]) -> String {
 ///
 /// The runner is named `<repo>-<N>`, using the lowest `N` not already taken by
 /// a Docker volume. Its volume of the same name holds the runner's home
-/// directory, and its container of the same name restarts unless stopped,
-/// refreshing the apt package index each time it starts.
+/// directory, and its container of the same name restarts unless stopped.
 /// Each step prints a line to standard output before it runs.
 /// If any step before starting the container fails, the container and volume
 /// created so far are removed.
@@ -263,9 +262,7 @@ fn create_container(name: &str) -> Result<(), String> {
         "--volume",
         &format!("{name}:/home/runner"),
         IMAGE,
-        "bash",
-        "-c",
-        "sudo apt-get update; exec ./run.sh",
+        "./run.sh",
     ])
     .map_err(|err| format!("failed to create the runner container: {err}"))?;
     Ok(())
