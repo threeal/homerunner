@@ -10,11 +10,16 @@ fn main() {
         .arg_required_else_help(true)
         .subcommand(
             clap::Command::new("add")
-                .about("Register a new self-hosted runner for a repository and start it")
+                .about("Register new self-hosted runners for a repository and start them")
                 .arg(clap::arg!(<URL> "The URL of the repository"))
                 .arg(
-                    clap::arg!(--token <TOKEN> "The registration token of the runner")
+                    clap::arg!(--token <TOKEN> "The registration token of the runners")
                         .required(true),
+                )
+                .arg(
+                    clap::arg!(--count <N> "The number of runners to add")
+                        .value_parser(clap::value_parser!(u32).range(1..))
+                        .default_value("1"),
                 ),
         )
         .subcommand(
@@ -39,7 +44,17 @@ fn main() {
             let token = matches
                 .get_one::<String>("token")
                 .expect("token is required");
-            homerunner::add(url, token).map(|name| println!("added runner {name}"))
+            let count = *matches
+                .get_one::<u32>("count")
+                .expect("count has a default");
+            (0..count).try_for_each(|added| {
+                homerunner::add(url, token)
+                    .map(|name| println!("added runner {name}"))
+                    .map_err(|err| match added {
+                        0 => err,
+                        _ => format!("added {added} of {count} runners before failing: {err}"),
+                    })
+            })
         }
         Some(("list", _)) => {
             homerunner::list().map(|runners| print!("{}", homerunner::format_runners(&runners)))
