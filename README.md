@@ -14,7 +14,13 @@ To add a runner, open the repository's "New self-hosted runner" page under Setti
 homerunner add https://github.com/<owner>/<repo> --token <TOKEN>
 ```
 
-The runner is named `<repo>-<N>`, using the lowest number not already taken, and runs in a Docker container of the same name that restarts unless stopped. Its home directory, including the build state in `_work`, lives in a Docker volume of the same name. Each registration token works once, so adding another runner takes a fresh one.
+The runner is named `<repo>-<N>`, using the lowest number not already taken, and runs in a Docker container of the same name that restarts unless stopped. Its home directory, including the build state in `_work`, lives in a Docker volume of the same name. A registration token expires an hour after it's created, and until then it can register as many runners as needed. To add several runners at once, pass `--count <N>`:
+
+```sh
+homerunner add https://github.com/<owner>/<repo> --token <TOKEN> --count <N>
+```
+
+The runners are added one after another, and if one fails, those added before it stay.
 
 The container runs homerunner's own Ubuntu 24.04 image, `ghcr.io/threeal/homerunner:ubuntu-24.04`, which ships the runner and the user it runs as, with passwordless sudo. Like GitHub-hosted Ubuntu runners, it comes with Clang, clang-format, CMake, Ninja, pipx, and rustup with a stable Rust toolchain preinstalled. Before each job, the runner refreshes the apt package index if it hasn't been updated in the last hour, so workflows can run `sudo apt-get install` without `apt-get update` first, as on GitHub-hosted runners.
 
