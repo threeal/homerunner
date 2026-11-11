@@ -28,6 +28,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV RUNNER_MANUALLY_TRAP_SIG=1
 ENV ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
 ENV ImageOS=ubuntu24
+ENV ACTIONS_RUNNER_HOOK_JOB_STARTED=/opt/homerunner/job-started.sh
 
 # As on GitHub-hosted runners, pipx installs apps outside the home directory,
 # with their commands on the PATH.
@@ -84,5 +85,9 @@ RUN curl -fsSL "https://github.com/actions/runner/releases/download/v${RUNNER_VE
     && ./bin/installdependencies.sh \
     && rm -rf /var/lib/apt/lists/* \
     && chown -R runner:runner /home/runner
+
+# Before each job, the runner refreshes the apt package index if it hasn't in
+# the last hour, so workflows can install packages without updating it first.
+COPY --chmod=755 job-started.sh /opt/homerunner/job-started.sh
 
 USER runner
