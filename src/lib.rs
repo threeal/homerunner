@@ -8,8 +8,8 @@ use std::process::Command;
 /// The image every runner container runs, built from `images/ubuntu-24.04`.
 const IMAGE: &str = "ghcr.io/threeal/homerunner:ubuntu-24.04";
 
-/// The label on each runner's volume holding the URL of its repository, which
-/// marks the volume as a runner's.
+/// The label on each runner's volume holding the URL of the repository or
+/// organization it's registered to, which marks the volume as a runner's.
 const URL_LABEL: &str = "homerunner.url";
 
 /// A runner managed by homerunner.
@@ -17,7 +17,7 @@ const URL_LABEL: &str = "homerunner.url";
 pub struct Runner {
     /// The name of the runner, its volume, and its container.
     pub name: String,
-    /// The URL of the repository the runner is registered to.
+    /// The URL of the repository or organization the runner is registered to.
     pub url: String,
     /// The state of the runner's container, such as `running` or `exited`, or
     /// `missing` if it has no container.
@@ -85,10 +85,10 @@ pub fn format_runners(runners: &[Runner]) -> String {
     })
 }
 
-/// Registers a new self-hosted runner for the repository at `url` and starts
-/// it, returning the runner's name.
+/// Registers a new self-hosted runner for the repository or organization at
+/// `url` and starts it, returning the runner's name.
 ///
-/// The runner is named `<repo>-<N>`, using the lowest `N` not already taken by
+/// The runner is named `<name>-<N>`, after the repository or organization, using the lowest `N` not already taken by
 /// a Docker volume. Its volume of the same name holds the runner's home
 /// directory, and its container of the same name restarts unless stopped.
 /// Each step prints a line to standard output before it runs.
@@ -97,14 +97,16 @@ pub fn format_runners(runners: &[Runner]) -> String {
 ///
 /// # Errors
 ///
-/// Returns an error if `url` has no repository name, or if any `docker` call
-/// fails.
+/// Returns an error if `url` has no repository or organization name, or if
+/// any `docker` call fails.
 #[cfg(not(tarpaulin_include))]
 pub fn add(url: &str, token: &str) -> Result<String, String> {
-    let repo = repo_name(url)?;
+    // GitHub rejects an organization URL with a trailing `/`.
+    let url = url.trim_end_matches('/');
+    let prefix = url_name(url)?;
     let volumes = docker(&["volume", "ls", "--format", "{{.Name}}"])
         .map_err(|err| format!("failed to list volumes: {err}"))?;
-    let name = next_runner_name(repo, volumes.lines());
+    let name = next_runner_name(prefix, volumes.lines());
 
     println!("creating volume {name}");
     docker(&[
@@ -163,7 +165,7 @@ fn create_and_register(name: &str, url: &str, token: &str) -> Result<(), String>
 /// GitHub, then removed, followed by its volume, which holds its registration
 /// and build state. A runner without a container just has its volume removed.
 /// The runner stays registered on GitHub, where it shows as offline until it's
-/// removed from the repository's runner settings.
+/// removed from the runner settings of its repository or organization.
 /// Each step prints a line to standard output before it runs.
 ///
 /// # Errors
@@ -291,9 +293,9 @@ fn docker(args: &[&str]) -> Result<String, String> {
     }
 }
 
-/// Returns the repository name at the end of `url`, without a trailing `/` or
-/// `.git`.
-fn repo_name(url: &str) -> Result<&str, String> {
+/// Returns the name of the repository or organization at the end of `url`,
+/// without a trailing `/` or `.git`.
+fn url_name(url: &str) -> Result<&str, String> {
     let last = url
         .trim_end_matches('/')
         .rsplit('/')
@@ -301,18 +303,18 @@ fn repo_name(url: &str) -> Result<&str, String> {
         .unwrap_or_default();
     let name = last.strip_suffix(".git").unwrap_or(last);
     if name.is_empty() {
-        return Err(format!("no repository name in URL: {url}"));
+        return Err(format!("no repository or organization name in URL: {url}"));
     }
     Ok(name)
 }
 
-/// Returns `<repo>-<N>` with the lowest `N`, starting from 1, that isn't in
+/// Returns `<prefix>-<N>` with the lowest `N`, starting from 1, that isn't in
 /// `taken`.
-fn next_runner_name<'a>(repo: &str, taken: impl IntoIterator<Item = &'a str>) -> String {
+fn next_runner_name<'a>(prefix: &str, taken: impl IntoIterator<Item = &'a str>) -> String {
     let taken: HashSet<&str> = taken.into_iter().collect();
     let mut n = 1;
     loop {
-        let name = format!("{repo}-{n}");
+        let name = format!("{prefix}-{n}");
         if !taken.contains(name.as_str()) {
             return name;
         }
@@ -325,26 +327,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_repo_name() {
+    fn get_url_name_of_repository() {
         assert_eq!(
-            repo_name("https://github.com/threeal/leetspace"),
+            url_name("https://github.com/threeal/leetspace"),
             Ok("leetspace")
         );
         assert_eq!(
-            repo_name("https://github.com/threeal/leetspace/"),
+            url_name("https://github.com/threeal/leetspace/"),
             Ok("leetspace")
         );
         assert_eq!(
-            repo_name("https://github.com/threeal/leetspace.git"),
+            url_name("https://github.com/threeal/leetspace.git"),
             Ok("leetspace")
         );
     }
 
     #[test]
-    fn get_repo_name_from_url_without_name() {
+    fn get_url_name_of_organization() {
+        assert_eq!(url_name("https://github.com/threeal"), Ok("threeal"));
+        assert_eq!(url_name("https://github.com/threeal/"), Ok("threeal"));
+    }
+
+    #[test]
+    fn get_url_name_from_url_without_name() {
         assert_eq!(
-            repo_name("/"),
-            Err("no repository name in URL: /".to_string())
+            url_name("/"),
+            Err("no repository or organization name in URL: /".to_string())
         );
     }
 
