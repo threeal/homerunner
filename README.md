@@ -22,9 +22,17 @@ homerunner add https://github.com/<owner>/<repo> --token <TOKEN> --count <N>
 
 The runners are added one after another, and if one fails, those added before it stay.
 
+To add a runner for an organization instead, which any of its repositories can use, copy the token from the organization's "New runner" page under Settings → Actions → Runners, which only organization owners can open, and run:
+
+```sh
+homerunner add https://github.com/<org> --token <TOKEN>
+```
+
+The runner is named `<org>-<N>` and joins the organization's Default runner group. That group doesn't let public repositories use its runners until "Allow public repositories" is turned on in its settings.
+
 The container runs homerunner's own Ubuntu 24.04 image, `ghcr.io/threeal/homerunner:ubuntu-24.04`, which ships the runner and the user it runs as, with passwordless sudo. Like GitHub-hosted Ubuntu runners, it comes with Clang, clang-format, CMake, Ninja, pipx, and rustup with a stable Rust toolchain preinstalled. Before each job, the runner refreshes the apt package index if it hasn't been updated in the last hour, so workflows can run `sudo apt-get install` without `apt-get update` first, as on GitHub-hosted runners.
 
-To list the runners homerunner manages, with the repository each is registered to and the state of its container, run:
+To list the runners homerunner manages, with the repository or organization each is registered to and the state of its container, run:
 
 ```sh
 homerunner list
@@ -44,7 +52,7 @@ To remove the runner `<NAME>` from the host, run:
 homerunner remove <NAME>
 ```
 
-It stops the runner's container, then removes the container and the volume, along with the runner's build state. The runner stays registered on GitHub, showing as offline, until you remove it from the repository's runner settings.
+It stops the runner's container, then removes the container and the volume, along with the runner's build state. The runner stays registered on GitHub, showing as offline, until you remove it from the runner settings of its repository or organization.
 
 ## Setup
 

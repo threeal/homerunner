@@ -10,8 +10,8 @@ fn main() {
         .arg_required_else_help(true)
         .subcommand(
             clap::Command::new("add")
-                .about("Register new self-hosted runners for a repository and start them")
-                .arg(clap::arg!(<URL> "The URL of the repository"))
+                .about("Register new self-hosted runners for a repository or organization and start them")
+                .arg(clap::arg!(<URL> "The URL of the repository or organization"))
                 .arg(
                     clap::arg!(--token <TOKEN> "The registration token of the runners")
                         .required(true),
@@ -24,7 +24,7 @@ fn main() {
         )
         .subcommand(
             clap::Command::new("list")
-                .about("List the runners, with their repositories and container states"),
+                .about("List the runners, with their repositories or organizations and container states"),
         )
         .subcommand(
             clap::Command::new("remove")
