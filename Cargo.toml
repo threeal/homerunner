@@ -7,7 +7,7 @@ edition = "2024"
 keywords = ["github-actions", "self-hosted-runner", "docker", "ci"]
 license = "MIT"
 repository = "https://github.com/threeal/homerunner"
-rust-version = "1.99"
+rust-version = "1.100"
 description = "Persistent self-hosted GitHub Actions runners in Docker"
 
 [dependencies]
