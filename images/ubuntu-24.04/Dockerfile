@@ -90,4 +90,8 @@ RUN curl -fsSL "https://github.com/actions/runner/releases/download/v${RUNNER_VE
 # the last hour, so workflows can install packages without updating it first.
 COPY --chmod=755 job-started.sh /opt/homerunner/job-started.sh
 
+# The command of a runner's container, which keeps a runner that gave up from
+# restarting.
+COPY --chmod=755 run.sh /opt/homerunner/run.sh
+
 USER runner
