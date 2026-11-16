@@ -14,7 +14,7 @@ To add a runner, open the repository's "New self-hosted runner" page under Setti
 homerunner add https://github.com/<owner>/<repo> --token <TOKEN>
 ```
 
-The runner is named `<repo>-<N>`, using the lowest number not already taken, and runs in a Docker container of the same name that restarts unless stopped. Its home directory, including the build state in `_work`, lives in a Docker volume of the same name. A registration token expires an hour after it's created, and until then it can register as many runners as needed. To add several runners at once, pass `--count <N>`:
+The runner is named `<repo>-<N>`, using the lowest number not already taken, and runs in a Docker container of the same name that comes back after the host reboots. If the runner gives up, such as when it's removed from GitHub or another runner takes over its registration, the container stays exited instead of restarting, which `homerunner list` shows. Its home directory, including the build state in `_work`, lives in a Docker volume of the same name. A registration token expires an hour after it's created, and until then it can register as many runners as needed. To add several runners at once, pass `--count <N>`:
 
 ```sh
 homerunner add https://github.com/<owner>/<repo> --token <TOKEN> --count <N>
