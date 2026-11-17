@@ -17,10 +17,11 @@ clap = "4.6.7"
 default = "deny"
 
 [lints.clippy]
-pedantic = "warn"
-nursery = "warn"
-cargo = "warn"
+all = "deny"
+pedantic = "deny"
+nursery = "deny"
+cargo = "deny"
 
 [lints.rust]
 warnings = "deny"
-missing_docs = "warn"
+missing_docs = "deny"
