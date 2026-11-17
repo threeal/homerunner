@@ -8,7 +8,7 @@ homerunner is a Rust library and CLI for deploying and managing persistent self-
 
 Runners run the images under `images/`, one directory per image, each listed in `docker-bake.hcl`. CI builds them with `docker buildx bake`, and `cd.yaml` publishes each to `ghcr.io/threeal/homerunner:<directory>` every Monday, to pick up updates to the base image and its packages, and on every push to `main` that changes an image, `docker-bake.hcl`, or `cd.yaml`, so other pushes don't make `homerunner update` recreate runners. A runner's volume is seeded from the image's `/home/runner` only once, so install nothing there but the runner itself. Tools in an image should behave as on the matching GitHub-hosted runner image, including their versions and where they install.
 
-Code that only calls `docker` is marked `#[cfg(not(tarpaulin_include))]` to exclude it from coverage; don't mock Docker to test it.
+Only code that calls `docker` goes in `src/docker.rs`, which `tarpaulin.toml` excludes from coverage; don't mock Docker to test it.
 
 ## Gotchas
 

@@ -1,7 +1,6 @@
 //! A command-line interface for deploying and managing persistent self-hosted
 //! GitHub Actions runners in Docker.
 
-#[cfg(not(tarpaulin_include))]
 fn main() {
     let matches = clap::Command::new("homerunner")
         .version(env!("CARGO_PKG_VERSION"))

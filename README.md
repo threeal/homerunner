@@ -82,7 +82,7 @@ Write code in `src/`. Unit tests live in a `tests` module alongside the code the
 cargo tarpaulin
 ```
 
-The project enforces 100% code coverage on every run.
+The project enforces 100% code coverage, excluding files listed under `exclude-files` in `tarpaulin.toml`.
 
 Each `git commit` runs the pre-commit hook registered during setup, which checks your changes and fixes what it can in place. If it fails, fix any reported issues, re-stage the changed files, and commit again.
 
