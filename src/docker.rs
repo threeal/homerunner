@@ -5,7 +5,7 @@
 
 use std::process::Command;
 
-use crate::{Runner, next_runner_name, parse_runners, url_name};
+use crate::{Runner, host_prefix, next_runner_name, parse_runners};
 
 /// The image every runner container runs, built from `images/ubuntu-24.04`.
 const IMAGE: &str = "ghcr.io/threeal/homerunner:ubuntu-24.04";
@@ -40,8 +40,8 @@ pub fn list() -> Result<Vec<Runner>, String> {
 /// Registers a new self-hosted runner for the repository or organization at
 /// `url` and starts it, returning the runner's name.
 ///
-/// The runner is named `<name>-<N>`, after the repository or organization, using the lowest `N` not already taken by
-/// a Docker volume. Its volume of the same name holds the runner's home
+/// The runner is named `<host>-<N>`, after this machine's hostname, using the
+/// lowest `N` not already taken by a Docker volume. Its volume of the same name holds the runner's home
 /// directory, and its container of the same name restarts when the Docker
 /// daemon does, but not once the runner gives up, such as when its
 /// registration is gone.
@@ -51,15 +51,17 @@ pub fn list() -> Result<Vec<Runner>, String> {
 ///
 /// # Errors
 ///
-/// Returns an error if `url` has no repository or organization name, or if
-/// any `docker` call fails.
+/// Returns an error if the hostname can't be read or has no character valid
+/// in a runner name, or if any `docker` call fails.
 pub fn add(url: &str, token: &str) -> Result<String, String> {
     // GitHub rejects an organization URL with a trailing `/`.
     let url = url.trim_end_matches('/');
-    let prefix = url_name(url)?;
+    let hostname = std::fs::read_to_string("/proc/sys/kernel/hostname")
+        .map_err(|err| format!("failed to read the hostname: {err}"))?;
+    let prefix = host_prefix(&hostname)?;
     let volumes = docker(&["volume", "ls", "--format", "{{.Name}}"])
         .map_err(|err| format!("failed to list volumes: {err}"))?;
-    let name = next_runner_name(prefix, volumes.lines());
+    let name = next_runner_name(&prefix, volumes.lines());
 
     println!("creating volume {name}");
     docker(&[

@@ -14,7 +14,7 @@ To add a runner, open the repository's "New self-hosted runner" page under Setti
 homerunner add https://github.com/<owner>/<repo> --token <TOKEN>
 ```
 
-The runner is named `<repo>-<N>`, using the lowest number not already taken, and runs in a Docker container of the same name that comes back after the host reboots. If the runner gives up, such as when it's removed from GitHub or another runner takes over its registration, the container stays exited instead of restarting, which `homerunner list` shows. Its home directory, including the build state in `_work`, lives in a Docker volume of the same name. A registration token expires an hour after it's created, and until then it can register as many runners as needed. To add several runners at once, pass `--count <N>`:
+The runner is named `<host>-<N>`, after the machine's hostname and using the lowest number not already taken on it, so runners on different machines never share a name. It runs in a Docker container of the same name that comes back after the host reboots. If the runner gives up, such as when it's removed from GitHub or another runner takes over its registration, the container stays exited instead of restarting, which `homerunner list` shows. Its home directory, including the build state in `_work`, lives in a Docker volume of the same name. A registration token expires an hour after it's created, and until then it can register as many runners as needed. To add several runners at once, pass `--count <N>`:
 
 ```sh
 homerunner add https://github.com/<owner>/<repo> --token <TOKEN> --count <N>
@@ -28,7 +28,7 @@ To add a runner for an organization instead, which any of its repositories can u
 homerunner add https://github.com/<org> --token <TOKEN>
 ```
 
-The runner is named `<org>-<N>` and joins the organization's Default runner group. That group doesn't let public repositories use its runners until "Allow public repositories" is turned on in its settings.
+The runner joins the organization's Default runner group. That group doesn't let public repositories use its runners until "Allow public repositories" is turned on in its settings.
 
 The container runs homerunner's own Ubuntu 24.04 image, `ghcr.io/threeal/homerunner:ubuntu-24.04`, which ships the runner and the user it runs as, with passwordless sudo. Like GitHub-hosted Ubuntu runners, it comes with Clang, clang-format, CMake, Ninja, pipx, and rustup with a stable Rust toolchain preinstalled. Before each job, the runner refreshes the apt package index if it hasn't been updated in the last hour, so workflows can run `sudo apt-get install` without `apt-get update` first, as on GitHub-hosted runners.
 
