@@ -57,19 +57,27 @@ pub fn format_runners(runners: &[Runner]) -> String {
     })
 }
 
-/// Returns the name of the repository or organization at the end of `url`,
-/// without a trailing `/` or `.git`.
-fn url_name(url: &str) -> Result<&str, String> {
-    let last = url
-        .trim_end_matches('/')
-        .rsplit('/')
-        .next()
-        .unwrap_or_default();
-    let name = last.strip_suffix(".git").unwrap_or(last);
-    if name.is_empty() {
-        return Err(format!("no repository or organization name in URL: {url}"));
+/// Returns `hostname` as a prefix for runner names, which must also be valid
+/// Docker volume and container names: the part before the first `.`,
+/// lowercased, with every character other than a letter, digit, or `-`
+/// replaced by `-`, and without leading or trailing `-`.
+fn host_prefix(hostname: &str) -> Result<String, String> {
+    let host = hostname.trim().split('.').next().unwrap_or_default();
+    let prefix: String = host
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let prefix = prefix.trim_matches('-');
+    if prefix.is_empty() {
+        return Err(format!("no valid runner name in hostname: {hostname}"));
     }
-    Ok(name)
+    Ok(prefix.to_string())
 }
 
 /// Returns `<prefix>-<N>` with the lowest `N`, starting from 1, that isn't in
@@ -91,32 +99,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_url_name_of_repository() {
-        assert_eq!(
-            url_name("https://github.com/threeal/leetspace"),
-            Ok("leetspace")
-        );
-        assert_eq!(
-            url_name("https://github.com/threeal/leetspace/"),
-            Ok("leetspace")
-        );
-        assert_eq!(
-            url_name("https://github.com/threeal/leetspace.git"),
-            Ok("leetspace")
-        );
+    fn get_host_prefix() {
+        assert_eq!(host_prefix("devbox\n"), Ok("devbox".to_string()));
+        assert_eq!(host_prefix("dev-box-2"), Ok("dev-box-2".to_string()));
     }
 
     #[test]
-    fn get_url_name_of_organization() {
-        assert_eq!(url_name("https://github.com/threeal"), Ok("threeal"));
-        assert_eq!(url_name("https://github.com/threeal/"), Ok("threeal"));
+    fn get_host_prefix_of_unusual_hostname() {
+        assert_eq!(host_prefix("DevBox.example.com"), Ok("devbox".to_string()));
+        assert_eq!(host_prefix("_dev_box_"), Ok("dev-box".to_string()));
     }
 
     #[test]
-    fn get_url_name_from_url_without_name() {
+    fn get_host_prefix_without_valid_name() {
         assert_eq!(
-            url_name("/"),
-            Err("no repository or organization name in URL: /".to_string())
+            host_prefix(".local"),
+            Err("no valid runner name in hostname: .local".to_string())
         );
     }
 
@@ -181,10 +179,10 @@ mod tests {
 
     #[test]
     fn get_next_runner_name() {
-        assert_eq!(next_runner_name("leetspace", []), "leetspace-1");
+        assert_eq!(next_runner_name("devbox", []), "devbox-1");
         assert_eq!(
-            next_runner_name("leetspace", ["other-1", "leetspace-1", "leetspace-3"]),
-            "leetspace-2"
+            next_runner_name("devbox", ["leetspace-1", "devbox-1", "devbox-3"]),
+            "devbox-2"
         );
     }
 }
