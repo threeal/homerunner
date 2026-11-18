@@ -19,7 +19,8 @@ fn main() {
                     clap::arg!(--count <N> "The number of runners to add")
                         .value_parser(clap::value_parser!(u32).range(1..))
                         .default_value("1"),
-                ),
+                )
+                .arg(clap::arg!(--prefix <PREFIX> "The prefix of the runners' names, instead of the hostname")),
         )
         .subcommand(
             clap::Command::new("list")
@@ -46,8 +47,9 @@ fn main() {
             let count = *matches
                 .get_one::<u32>("count")
                 .expect("count has a default");
+            let prefix = matches.get_one::<String>("prefix").map(String::as_str);
             (0..count).try_for_each(|added| {
-                homerunner::add(url, token)
+                homerunner::add(url, token, prefix)
                     .map(|name| println!("added runner {name}"))
                     .map_err(|err| match added {
                         0 => err,
