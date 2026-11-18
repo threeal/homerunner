@@ -11,8 +11,11 @@ pub use docker::{add, list, remove, update};
 /// A runner managed by homerunner.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Runner {
-    /// The name of the runner, its volume, and its container.
+    /// The name of the runner on GitHub and in every command.
     pub name: String,
+    /// The name of the runner's volume and container, `homerunner-<name>`, or
+    /// `<name>` for a runner added before homerunner prefixed it.
+    pub docker_name: String,
     /// The URL of the repository or organization the runner is registered to.
     pub url: String,
     /// The state of the runner's container, such as `running` or `exited`, or
@@ -20,9 +23,12 @@ pub struct Runner {
     pub state: String,
 }
 
-/// Returns the runners in `volumes`, lines of a volume's name and URL label,
-/// each with the state of the container of the same name in `containers`,
-/// lines of a container's name and state, sorted by name.
+/// Returns the runners in `volumes`, lines of a volume's name, name label, and
+/// URL label, each with the state of the container of the same name in
+/// `containers`, lines of a container's name and state, sorted by name.
+///
+/// A volume without a name label belongs to a runner added before homerunner
+/// prefixed Docker names, so the runner is named after the volume.
 fn parse_runners(volumes: &str, containers: &str) -> Vec<Runner> {
     let states: HashMap<&str, &str> = containers
         .lines()
@@ -30,11 +36,15 @@ fn parse_runners(volumes: &str, containers: &str) -> Vec<Runner> {
         .collect();
     let mut runners: Vec<Runner> = volumes
         .lines()
-        .filter_map(|line| line.split_once('\t'))
-        .map(|(name, url)| Runner {
-            name: name.to_string(),
+        .filter_map(|line| {
+            let mut fields = line.splitn(3, '\t');
+            Some((fields.next()?, fields.next()?, fields.next()?))
+        })
+        .map(|(docker_name, name, url)| Runner {
+            name: if name.is_empty() { docker_name } else { name }.to_string(),
+            docker_name: docker_name.to_string(),
             url: url.to_string(),
-            state: states.get(name).unwrap_or(&"missing").to_string(),
+            state: states.get(docker_name).unwrap_or(&"missing").to_string(),
         })
         .collect();
     runners.sort_by(|a, b| a.name.cmp(&b.name));
@@ -120,27 +130,30 @@ mod tests {
 
     #[test]
     fn parse_runners_with_states() {
-        let volumes = "repo-2\thttps://github.com/owner/repo\n\
-                       other-1\thttps://github.com/owner/other\n\
-                       repo-1\thttps://github.com/owner/repo\n";
-        let containers = "repo-1\trunning\nrepo-2\texited\nunrelated\trunning\n";
+        let volumes = "homerunner-host-2\thost-2\thttps://github.com/owner/repo\n\
+                       homerunner-host-3\thost-3\thttps://github.com/owner/other\n\
+                       host-1\t\thttps://github.com/owner/repo\n";
+        let containers = "host-1\trunning\nhomerunner-host-2\texited\nunrelated\trunning\n";
         assert_eq!(
             parse_runners(volumes, containers),
             [
                 Runner {
-                    name: "other-1".to_string(),
-                    url: "https://github.com/owner/other".to_string(),
-                    state: "missing".to_string(),
-                },
-                Runner {
-                    name: "repo-1".to_string(),
+                    name: "host-1".to_string(),
+                    docker_name: "host-1".to_string(),
                     url: "https://github.com/owner/repo".to_string(),
                     state: "running".to_string(),
                 },
                 Runner {
-                    name: "repo-2".to_string(),
+                    name: "host-2".to_string(),
+                    docker_name: "homerunner-host-2".to_string(),
                     url: "https://github.com/owner/repo".to_string(),
                     state: "exited".to_string(),
+                },
+                Runner {
+                    name: "host-3".to_string(),
+                    docker_name: "homerunner-host-3".to_string(),
+                    url: "https://github.com/owner/other".to_string(),
+                    state: "missing".to_string(),
                 },
             ]
         );
@@ -156,11 +169,13 @@ mod tests {
         let runners = [
             Runner {
                 name: "leetspace-1".to_string(),
+                docker_name: "leetspace-1".to_string(),
                 url: "https://github.com/threeal/leetspace".to_string(),
                 state: "running".to_string(),
             },
             Runner {
                 name: "repo-10".to_string(),
+                docker_name: "homerunner-repo-10".to_string(),
                 url: "https://github.com/owner/repo".to_string(),
                 state: "missing".to_string(),
             },
