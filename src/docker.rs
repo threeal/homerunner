@@ -5,7 +5,7 @@
 
 use std::process::Command;
 
-use crate::{Runner, host_prefix, next_runner_name, parse_runners};
+use crate::{Runner, check_prefix, host_prefix, next_runner_name, parse_runners};
 
 /// The image every runner container runs, built from `images/ubuntu-24.04`.
 const IMAGE: &str = "ghcr.io/threeal/homerunner:ubuntu-24.04";
@@ -48,9 +48,9 @@ pub fn list() -> Result<Vec<Runner>, String> {
 /// Registers a new self-hosted runner for the repository or organization at
 /// `url` and starts it, returning the runner's name.
 ///
-/// The runner is named `<host>-<N>`, after this machine's hostname, using the
-/// lowest `N` not already taken by a runner, or by a Docker volume or
-/// container named `homerunner-<host>-<N>`. Its volume `homerunner-<name>`
+/// The runner is named `<prefix>-<N>`, after `prefix` or, without it, this
+/// machine's hostname, using the lowest `N` not already taken by a runner, or
+/// by a Docker volume or container named `homerunner-<prefix>-<N>`. Its volume `homerunner-<name>`
 /// holds the runner's home directory, and its container of the same name
 /// restarts when the Docker daemon does, but not once the runner gives up,
 /// such as when its registration is gone.
@@ -60,14 +60,20 @@ pub fn list() -> Result<Vec<Runner>, String> {
 ///
 /// # Errors
 ///
-/// Returns an error if the hostname can't be read or has no character valid
-/// in a runner name, or if any `docker` call fails.
-pub fn add(url: &str, token: &str) -> Result<String, String> {
+/// Returns an error if `prefix` isn't valid in a runner name, if it's not
+/// given and the hostname can't be read or has no character valid in a runner
+/// name, or if any `docker` call fails.
+pub fn add(url: &str, token: &str, prefix: Option<&str>) -> Result<String, String> {
     // GitHub rejects an organization URL with a trailing `/`.
     let url = url.trim_end_matches('/');
-    let hostname = std::fs::read_to_string("/proc/sys/kernel/hostname")
-        .map_err(|err| format!("failed to read the hostname: {err}"))?;
-    let prefix = host_prefix(&hostname)?;
+    let prefix = if let Some(prefix) = prefix {
+        check_prefix(prefix)?;
+        prefix.to_string()
+    } else {
+        let hostname = std::fs::read_to_string("/proc/sys/kernel/hostname")
+            .map_err(|err| format!("failed to read the hostname: {err}"))?;
+        host_prefix(&hostname)?
+    };
     let runners = list()?;
     let volumes = docker(&["volume", "ls", "--format", "{{.Name}}"])
         .map_err(|err| format!("failed to list volumes: {err}"))?;

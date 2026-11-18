@@ -90,6 +90,22 @@ fn host_prefix(hostname: &str) -> Result<String, String> {
     Ok(prefix.to_string())
 }
 
+/// Checks that `prefix`, given for runner names, is also valid in Docker
+/// volume and container names: holding only lowercase letters, digits, and
+/// `-`, and not starting or ending with `-`.
+fn check_prefix(prefix: &str) -> Result<(), String> {
+    let valid = prefix
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    if !valid || prefix.is_empty() || prefix.starts_with('-') || prefix.ends_with('-') {
+        return Err(format!(
+            "invalid runner name prefix: {prefix:?}, which must hold only \
+             lowercase letters, digits, and `-`, and not start or end with `-`"
+        ));
+    }
+    Ok(())
+}
+
 /// Returns `<prefix>-<N>` with the lowest `N`, starting from 1, that isn't in
 /// `taken`.
 fn next_runner_name<'a>(prefix: &str, taken: impl IntoIterator<Item = &'a str>) -> String {
@@ -126,6 +142,25 @@ mod tests {
             host_prefix(".local"),
             Err("no valid runner name in hostname: .local".to_string())
         );
+    }
+
+    #[test]
+    fn check_valid_prefix() {
+        assert_eq!(check_prefix("build"), Ok(()));
+        assert_eq!(check_prefix("ci-box-2"), Ok(()));
+    }
+
+    #[test]
+    fn check_invalid_prefix() {
+        for prefix in ["", "Build", "ci_box", "ci.box", "-ci", "ci-"] {
+            assert_eq!(
+                check_prefix(prefix),
+                Err(format!(
+                    "invalid runner name prefix: {prefix:?}, which must hold only \
+                     lowercase letters, digits, and `-`, and not start or end with `-`"
+                ))
+            );
+        }
     }
 
     #[test]
