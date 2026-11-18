@@ -14,6 +14,14 @@ const IMAGE: &str = "ghcr.io/threeal/homerunner:ubuntu-24.04";
 /// organization it's registered to, which marks the volume as a runner's.
 const URL_LABEL: &str = "homerunner.url";
 
+/// The label on each runner's volume holding the runner's name, missing on
+/// runners added before homerunner prefixed Docker names.
+const NAME_LABEL: &str = "homerunner.name";
+
+/// The prefix of a runner's volume and container names, which tells them
+/// apart from Docker resources that homerunner doesn't manage.
+const DOCKER_PREFIX: &str = "homerunner-";
+
 /// Returns every runner managed by homerunner, sorted by name.
 ///
 /// Runners are found by the label on their volumes, so containers and volumes
@@ -29,7 +37,7 @@ pub fn list() -> Result<Vec<Runner>, String> {
         "--filter",
         &format!("label={URL_LABEL}"),
         "--format",
-        &format!("{{{{.Name}}}}\t{{{{.Label \"{URL_LABEL}\"}}}}"),
+        &format!("{{{{.Name}}}}\t{{{{.Label \"{NAME_LABEL}\"}}}}\t{{{{.Label \"{URL_LABEL}\"}}}}"),
     ])
     .map_err(|err| format!("failed to list volumes: {err}"))?;
     let containers = docker(&["ps", "--all", "--format", "{{.Names}}\t{{.State}}"])
@@ -41,10 +49,11 @@ pub fn list() -> Result<Vec<Runner>, String> {
 /// `url` and starts it, returning the runner's name.
 ///
 /// The runner is named `<host>-<N>`, after this machine's hostname, using the
-/// lowest `N` not already taken by a Docker volume. Its volume of the same name holds the runner's home
-/// directory, and its container of the same name restarts when the Docker
-/// daemon does, but not once the runner gives up, such as when its
-/// registration is gone.
+/// lowest `N` not already taken by a runner, or by a Docker volume or
+/// container named `homerunner-<host>-<N>`. Its volume `homerunner-<name>`
+/// holds the runner's home directory, and its container of the same name
+/// restarts when the Docker daemon does, but not once the runner gives up,
+/// such as when its registration is gone.
 /// Each step prints a line to standard output before it runs.
 /// If any step before starting the container fails, the container and volume
 /// created so far are removed.
@@ -59,36 +68,53 @@ pub fn add(url: &str, token: &str) -> Result<String, String> {
     let hostname = std::fs::read_to_string("/proc/sys/kernel/hostname")
         .map_err(|err| format!("failed to read the hostname: {err}"))?;
     let prefix = host_prefix(&hostname)?;
+    let runners = list()?;
     let volumes = docker(&["volume", "ls", "--format", "{{.Name}}"])
         .map_err(|err| format!("failed to list volumes: {err}"))?;
-    let name = next_runner_name(&prefix, volumes.lines());
+    let containers = docker(&["ps", "--all", "--format", "{{.Names}}"])
+        .map_err(|err| format!("failed to list containers: {err}"))?;
+    let taken_names = runners.iter().map(|runner| runner.name.as_str()).chain(
+        volumes
+            .lines()
+            .chain(containers.lines())
+            .filter_map(|docker_name| docker_name.strip_prefix(DOCKER_PREFIX)),
+    );
+    let name = next_runner_name(&prefix, taken_names);
+    let docker_name = format!("{DOCKER_PREFIX}{name}");
 
-    println!("creating volume {name}");
+    println!("creating volume {docker_name}");
     docker(&[
         "volume",
         "create",
         "--label",
+        &format!("{NAME_LABEL}={name}"),
+        "--label",
         &format!("{URL_LABEL}={url}"),
-        &name,
+        &docker_name,
     ])
     .map_err(|err| format!("failed to create the runner volume: {err}"))?;
 
-    if let Err(err) = create_and_register(&name, url, token) {
-        println!("removing container and volume {name}");
-        let _ = docker(&["rm", "--force", &name]);
-        let _ = docker(&["volume", "rm", &name]);
+    if let Err(err) = create_and_register(&name, &docker_name, url, token) {
+        println!("removing container and volume {docker_name}");
+        let _ = docker(&["rm", "--force", &docker_name]);
+        let _ = docker(&["volume", "rm", &docker_name]);
         return Err(err);
     }
 
-    println!("starting container {name}");
-    docker(&["start", &name]).map_err(|err| format!("failed to start the runner: {err}"))?;
+    println!("starting container {docker_name}");
+    docker(&["start", &docker_name]).map_err(|err| format!("failed to start the runner: {err}"))?;
     Ok(name)
 }
 
-/// Creates the container of the runner `name` without starting it, then
-/// registers the runner with GitHub in a throwaway container.
-fn create_and_register(name: &str, url: &str, token: &str) -> Result<(), String> {
-    create_container(name)?;
+/// Creates the container `docker_name` of the runner `name` without starting
+/// it, then registers the runner with GitHub in a throwaway container.
+fn create_and_register(
+    name: &str,
+    docker_name: &str,
+    url: &str,
+    token: &str,
+) -> Result<(), String> {
+    create_container(docker_name)?;
 
     println!("registering runner {name} to {url}");
     docker(&[
@@ -97,7 +123,7 @@ fn create_and_register(name: &str, url: &str, token: &str) -> Result<(), String>
         "--env",
         "ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=",
         "--volume",
-        &format!("{name}:/home/runner"),
+        &format!("{docker_name}:/home/runner"),
         IMAGE,
         "./config.sh",
         "--unattended",
@@ -127,22 +153,25 @@ fn create_and_register(name: &str, url: &str, token: &str) -> Result<(), String>
 /// Returns an error if there's no runner named `name`, or if any `docker` call
 /// fails.
 pub fn remove(name: &str) -> Result<(), String> {
-    let runner = list()?
+    let Runner {
+        docker_name, state, ..
+    } = list()?
         .into_iter()
         .find(|runner| runner.name == name)
         .ok_or_else(|| format!("no runner named {name}"))?;
 
-    if runner.state != "missing" {
-        println!("stopping container {name}");
-        docker(&["stop", name]).map_err(|err| format!("failed to stop the runner: {err}"))?;
+    if state != "missing" {
+        println!("stopping container {docker_name}");
+        docker(&["stop", &docker_name])
+            .map_err(|err| format!("failed to stop the runner: {err}"))?;
 
-        println!("removing container {name}");
-        docker(&["rm", name])
+        println!("removing container {docker_name}");
+        docker(&["rm", &docker_name])
             .map_err(|err| format!("failed to remove the runner container: {err}"))?;
     }
 
-    println!("removing volume {name}");
-    docker(&["volume", "rm", name])
+    println!("removing volume {docker_name}");
+    docker(&["volume", "rm", &docker_name])
         .map_err(|err| format!("failed to remove the runner volume: {err}"))?;
     Ok(())
 }
@@ -176,44 +205,58 @@ pub fn update(name: Option<&str>) -> Result<Vec<String>, String> {
         .map_err(|err| format!("failed to inspect the image: {err}"))?;
 
     let mut updated = Vec::new();
-    for Runner { name, state, .. } in runners {
+    for Runner {
+        name,
+        docker_name,
+        state,
+        ..
+    } in runners
+    {
         if state != "missing" {
-            let current = docker(&["container", "inspect", "--format", "{{.Image}}", &name])
-                .map_err(|err| format!("failed to inspect the runner container: {err}"))?;
+            let current = docker(&[
+                "container",
+                "inspect",
+                "--format",
+                "{{.Image}}",
+                &docker_name,
+            ])
+            .map_err(|err| format!("failed to inspect the runner container: {err}"))?;
             if current.trim() == image.trim() {
                 println!("runner {name} is up to date");
                 continue;
             }
 
-            println!("stopping container {name}");
-            docker(&["stop", &name]).map_err(|err| format!("failed to stop the runner: {err}"))?;
+            println!("stopping container {docker_name}");
+            docker(&["stop", &docker_name])
+                .map_err(|err| format!("failed to stop the runner: {err}"))?;
 
-            println!("removing container {name}");
-            docker(&["rm", &name])
+            println!("removing container {docker_name}");
+            docker(&["rm", &docker_name])
                 .map_err(|err| format!("failed to remove the runner container: {err}"))?;
         }
 
-        create_container(&name)?;
+        create_container(&docker_name)?;
 
-        println!("starting container {name}");
-        docker(&["start", &name]).map_err(|err| format!("failed to start the runner: {err}"))?;
+        println!("starting container {docker_name}");
+        docker(&["start", &docker_name])
+            .map_err(|err| format!("failed to start the runner: {err}"))?;
         updated.push(name);
     }
     Ok(updated)
 }
 
-/// Creates the container of the runner `name` on its volume, without starting
-/// it.
-fn create_container(name: &str) -> Result<(), String> {
-    println!("creating container {name}");
+/// Creates a runner's container `docker_name` on its volume of the same name,
+/// without starting it.
+fn create_container(docker_name: &str) -> Result<(), String> {
+    println!("creating container {docker_name}");
     docker(&[
         "create",
         "--name",
-        name,
+        docker_name,
         "--restart",
         "on-failure",
         "--volume",
-        &format!("{name}:/home/runner"),
+        &format!("{docker_name}:/home/runner"),
         IMAGE,
         "/opt/homerunner/run.sh",
     ])
