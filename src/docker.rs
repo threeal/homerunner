@@ -50,10 +50,12 @@ pub fn list() -> Result<Vec<Runner>, String> {
 ///
 /// The runner is named `<prefix>-<N>`, after `prefix` or, without it, this
 /// machine's hostname, using the lowest `N` not already taken by a runner, or
-/// by a Docker volume or container named `homerunner-<prefix>-<N>`. Its volume `homerunner-<name>`
-/// holds the runner's home directory, and its container of the same name
-/// restarts when the Docker daemon does, but not once the runner gives up,
-/// such as when its registration is gone.
+/// by a Docker volume or container named `homerunner-<prefix>-<N>`. Its
+/// volume `homerunner-<name>` holds the runner's home directory, and its
+/// container of the same name restarts when the Docker daemon does, but not
+/// once the runner gives up, such as when its registration is gone.
+/// The image is pulled first, so the runner runs the latest one even on a host
+/// that already has an older copy.
 /// Each step prints a line to standard output before it runs.
 /// If any step before starting the container fails, the container and volume
 /// created so far are removed.
@@ -74,6 +76,11 @@ pub fn add(url: &str, token: &str, prefix: Option<&str>) -> Result<String, Strin
             .map_err(|err| format!("failed to read the hostname: {err}"))?;
         host_prefix(&hostname)?
     };
+
+    println!("pulling image {IMAGE}");
+    docker(&["pull", "--quiet", IMAGE])
+        .map_err(|err| format!("failed to pull the image: {err}"))?;
+
     let runners = list()?;
     let volumes = docker(&["volume", "ls", "--format", "{{.Name}}"])
         .map_err(|err| format!("failed to list volumes: {err}"))?;
