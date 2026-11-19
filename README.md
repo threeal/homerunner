@@ -14,7 +14,7 @@ To add a runner, open the repository's "New self-hosted runner" page under Setti
 homerunner add https://github.com/<owner>/<repo> --token <TOKEN>
 ```
 
-The runner is named `<host>-<N>`, after the machine's hostname and using the lowest number not already taken on it, so runners on different machines never share a name. To name it after something else, pass `--prefix <PREFIX>`, made of lowercase letters, digits, and `-`, and it's named `<PREFIX>-<N>` instead. The runner runs in a Docker container named after it with a `homerunner-` prefix, such as `homerunner-<host>-<N>`, that comes back after the host reboots. If the runner gives up, such as when it's removed from GitHub or another runner takes over its registration, the container stays exited instead of restarting, which `homerunner list` shows. Its home directory, including the build state in `_work`, lives in a Docker volume of the same name. Runners added by earlier versions of homerunner keep Docker names without the `homerunner-` prefix. A registration token expires an hour after it's created, and until then it can register as many runners as needed. To add several runners at once, pass `--count <N>`:
+The runner is named `<host>-<N>`, after the machine's hostname and using the lowest number not already taken on it, so runners on different machines never share a name. To name it after something else, pass `--prefix <PREFIX>`, made of lowercase letters, digits, and `-`, and it's named `<PREFIX>-<N>` instead. Give each machine its own prefix, since a runner added under a name already registered on GitHub replaces the runner there. The runner runs in a Docker container named after it with a `homerunner-` prefix, such as `homerunner-<host>-<N>`, that comes back after the host reboots. If the runner gives up, such as when it's removed from GitHub or another runner takes over its registration, the container stays exited instead of restarting, which `homerunner list` shows. Its home directory, including the build state in `_work`, lives in a Docker volume of the same name. Runners added by earlier versions of homerunner keep Docker names without the `homerunner-` prefix. A registration token expires an hour after it's created, and until then it can register as many runners as needed. To add several runners at once, pass `--count <N>`:
 
 ```sh
 homerunner add https://github.com/<owner>/<repo> --token <TOKEN> --count <N>
@@ -52,7 +52,7 @@ To remove the runner `<NAME>` from the host, run:
 homerunner remove <NAME>
 ```
 
-It stops the runner's container, then removes the container and the volume, along with the runner's build state. The runner stays registered on GitHub, showing as offline, until you remove it from the runner settings of its repository or organization.
+It stops the runner's container, then removes the container and the volume, along with the runner's build state. The runner stays registered on GitHub, showing as offline, until you remove it from the runner settings of its repository or organization, or until a runner added later under the same name replaces it.
 
 ## Setup
 

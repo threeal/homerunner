@@ -114,6 +114,9 @@ pub fn add(url: &str, token: &str, prefix: Option<&str>) -> Result<String, Strin
 
 /// Creates the container `docker_name` of the runner `name` without starting
 /// it, then registers the runner with GitHub in a throwaway container.
+///
+/// A runner already registered under `name` is replaced. Runner names start
+/// with this host's own prefix, so it can only be a runner this host removed.
 fn create_and_register(
     name: &str,
     docker_name: &str,
@@ -139,6 +142,7 @@ fn create_and_register(
         token,
         "--name",
         name,
+        "--replace",
     ])
     .map_err(|err| format!("failed to register the runner: {err}"))?;
 
@@ -151,7 +155,8 @@ fn create_and_register(
 /// GitHub, then removed, followed by its volume, which holds its registration
 /// and build state. A runner without a container just has its volume removed.
 /// The runner stays registered on GitHub, where it shows as offline until it's
-/// removed from the runner settings of its repository or organization.
+/// removed from the runner settings of its repository or organization, or
+/// until a runner added later under the same name replaces it.
 /// Each step prints a line to standard output before it runs.
 ///
 /// # Errors
