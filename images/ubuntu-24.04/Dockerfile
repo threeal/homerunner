@@ -80,10 +80,13 @@ USER root
 WORKDIR /home/runner
 
 # Only the runner goes in the home directory, since a runner's volume is
-# seeded from it once and never picks up later changes to the image.
+# seeded from it once and never picks up later changes to the image. The empty
+# `_work` seeds each new work volume mounted over it, so it's owned by the
+# runner user.
 RUN curl -fsSL "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" | tar -xz \
     && ./bin/installdependencies.sh \
     && rm -rf /var/lib/apt/lists/* \
+    && mkdir _work \
     && chown -R runner:runner /home/runner
 
 # Before each job, the runner refreshes the apt package index if it hasn't in

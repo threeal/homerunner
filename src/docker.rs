@@ -22,6 +22,11 @@ const NAME_LABEL: &str = "homerunner.name";
 /// apart from Docker resources that homerunner doesn't manage.
 const DOCKER_PREFIX: &str = "homerunner-";
 
+/// The suffix of the name of each runner's work volume, mounted over its
+/// `_work` directory, after its volume and container name. Runner names always
+/// end in `-<N>`, so it never makes another runner's name.
+const WORK_SUFFIX: &str = "-work";
+
 /// Returns every runner managed by homerunner, sorted by name.
 ///
 /// Runners are found by the label on their volumes, so containers and volumes
@@ -51,13 +56,15 @@ pub fn list() -> Result<Vec<Runner>, String> {
 /// The runner is named `<prefix>-<N>`, after `prefix` or, without it, this
 /// machine's hostname, using the lowest `N` not already taken by a runner, or
 /// by a Docker volume or container named `homerunner-<prefix>-<N>`. Its
-/// volume `homerunner-<name>` holds the runner's home directory, and its
-/// container of the same name restarts when the Docker daemon does, but not
-/// once the runner gives up, such as when its registration is gone.
+/// volume `homerunner-<name>` holds the runner's home directory, its work
+/// volume `homerunner-<name>-work` holds the build state in the home
+/// directory's `_work`, and its container `homerunner-<name>` restarts when
+/// the Docker daemon does, but not once the runner gives up, such as when its
+/// registration is gone.
 /// The image is pulled first, so the runner runs the latest one even on a host
 /// that already has an older copy.
 /// Each step prints a line to standard output before it runs.
-/// If any step before starting the container fails, the container and volume
+/// If any step before starting the container fails, the container and volumes
 /// created so far are removed.
 ///
 /// # Errors
@@ -108,8 +115,14 @@ pub fn add(url: &str, token: &str, prefix: Option<&str>) -> Result<String, Strin
     .map_err(|err| format!("failed to create the runner volume: {err}"))?;
 
     if let Err(err) = create_and_register(&name, &docker_name, url, token) {
-        println!("removing container and volume {docker_name}");
+        println!("removing container and volumes {docker_name}");
         let _ = docker(&["rm", "--force", &docker_name]);
+        let _ = docker(&[
+            "volume",
+            "rm",
+            "--force",
+            &format!("{docker_name}{WORK_SUFFIX}"),
+        ]);
         let _ = docker(&["volume", "rm", &docker_name]);
         return Err(err);
     }
@@ -159,8 +172,10 @@ fn create_and_register(
 /// Removes the runner `name` from this host.
 ///
 /// The runner's container is stopped, letting the runner end its session with
-/// GitHub, then removed, followed by its volume, which holds its registration
-/// and build state. A runner without a container just has its volume removed.
+/// GitHub, then removed, followed by its work volume, which holds its build
+/// state, and its volume, which holds its registration. A runner without a
+/// container just has its volumes removed, and a runner added before
+/// homerunner gave runners work volumes has none to remove.
 /// The runner stays registered on GitHub, where it shows as offline until it's
 /// removed from the runner settings of its repository or organization, or
 /// until a runner added later under the same name replaces it.
@@ -188,6 +203,8 @@ pub fn remove(name: &str) -> Result<(), String> {
             .map_err(|err| format!("failed to remove the runner container: {err}"))?;
     }
 
+    remove_work_volume(&docker_name)?;
+
     println!("removing volume {docker_name}");
     docker(&["volume", "rm", &docker_name])
         .map_err(|err| format!("failed to remove the runner volume: {err}"))?;
@@ -200,7 +217,9 @@ pub fn remove(name: &str) -> Result<(), String> {
 /// The image is pulled first. Each runner whose container already runs it is
 /// left untouched. Any other runner has its container stopped, letting the
 /// runner end its session with GitHub, then removed, and recreated and started
-/// on the same volume. A runner without a container gets a new one.
+/// on the same volume, but on a new work volume replacing the old one, so that
+/// build state made on one image never carries over to the next. A runner
+/// without a container gets a new one, also on a new work volume.
 /// Each step prints a line to standard output before it runs.
 ///
 /// # Errors
@@ -253,6 +272,7 @@ pub fn update(name: Option<&str>) -> Result<Vec<String>, String> {
                 .map_err(|err| format!("failed to remove the runner container: {err}"))?;
         }
 
+        remove_work_volume(&docker_name)?;
         create_container(&docker_name)?;
 
         println!("starting container {docker_name}");
@@ -263,9 +283,25 @@ pub fn update(name: Option<&str>) -> Result<Vec<String>, String> {
     Ok(updated)
 }
 
+/// Removes the work volume of the runner whose volume is `docker_name`, if it
+/// has one.
+fn remove_work_volume(docker_name: &str) -> Result<(), String> {
+    let work_volume = format!("{docker_name}{WORK_SUFFIX}");
+    println!("removing volume {work_volume}");
+    docker(&["volume", "rm", "--force", &work_volume])
+        .map_err(|err| format!("failed to remove the runner work volume: {err}"))?;
+    Ok(())
+}
+
 /// Creates a runner's container `docker_name` on its volume of the same name,
+/// with its work volume, created if missing, mounted over the volume's `_work`,
 /// without starting it.
 fn create_container(docker_name: &str) -> Result<(), String> {
+    let work_volume = format!("{docker_name}{WORK_SUFFIX}");
+    println!("creating volume {work_volume}");
+    docker(&["volume", "create", &work_volume])
+        .map_err(|err| format!("failed to create the runner work volume: {err}"))?;
+
     println!("creating container {docker_name}");
     docker(&[
         "create",
@@ -275,6 +311,8 @@ fn create_container(docker_name: &str) -> Result<(), String> {
         "on-failure",
         "--volume",
         &format!("{docker_name}:/home/runner"),
+        "--volume",
+        &format!("{work_volume}:/home/runner/_work"),
         IMAGE,
         "/opt/homerunner/run.sh",
     ])

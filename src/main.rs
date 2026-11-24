@@ -28,7 +28,7 @@ fn main() {
         )
         .subcommand(
             clap::Command::new("remove")
-                .about("Stop a runner and remove its container and volume")
+                .about("Stop a runner and remove its container and volumes")
                 .arg(clap::arg!(<NAME> "The name of the runner")),
         )
         .subcommand(
