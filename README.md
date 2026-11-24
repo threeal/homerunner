@@ -14,7 +14,7 @@ To add a runner, open the repository's "New self-hosted runner" page under Setti
 homerunner add https://github.com/<owner>/<repo> --token <TOKEN>
 ```
 
-The runner is named `<host>-<N>`, after the machine's hostname and using the lowest number not already taken on it, so runners on different machines never share a name. To name it after something else, pass `--prefix <PREFIX>`, made of lowercase letters, digits, and `-`, and it's named `<PREFIX>-<N>` instead. Give each machine its own prefix, since a runner added under a name already registered on GitHub replaces the runner there. The runner runs in a Docker container named after it with a `homerunner-` prefix, such as `homerunner-<host>-<N>`, that comes back after the host reboots. If the runner gives up, such as when it's removed from GitHub or another runner takes over its registration, the container stays exited instead of restarting, which `homerunner list` shows. Its home directory, including the build state in `_work`, lives in a Docker volume of the same name. Runners added by earlier versions of homerunner keep Docker names without the `homerunner-` prefix. A registration token expires an hour after it's created, and until then it can register as many runners as needed. To add several runners at once, pass `--count <N>`:
+The runner is named `<host>-<N>`, after the machine's hostname and using the lowest number not already taken on it, so runners on different machines never share a name. To name it after something else, pass `--prefix <PREFIX>`, made of lowercase letters, digits, and `-`, and it's named `<PREFIX>-<N>` instead. Give each machine its own prefix, since a runner added under a name already registered on GitHub replaces the runner there. The runner runs in a Docker container named after it with a `homerunner-` prefix, such as `homerunner-<host>-<N>`, that comes back after the host reboots. If the runner gives up, such as when it's removed from GitHub or another runner takes over its registration, the container stays exited instead of restarting, which `homerunner list` shows. Its home directory, holding its registration, lives in a Docker volume of the same name, and the build state in its `_work` lives in a separate volume with a `-work` suffix, such as `homerunner-<host>-<N>-work`. Runners added by earlier versions of homerunner keep Docker names without the `homerunner-` prefix. A registration token expires an hour after it's created, and until then it can register as many runners as needed. To add several runners at once, pass `--count <N>`:
 
 ```sh
 homerunner add https://github.com/<owner>/<repo> --token <TOKEN> --count <N>
@@ -44,7 +44,7 @@ homerunner publishes a new image whenever its `main` branch changes the image, a
 homerunner update [<NAME>]
 ```
 
-It pulls the image, then stops, recreates, and starts the container of each runner not on it yet, keeping its volume and registration, so it needs no token. Stopping a container cancels any job its runner is running.
+It pulls the image, then stops, recreates, and starts the container of each runner not on it yet, keeping its volume and registration, so it needs no token. Its work volume is replaced with an empty one, so build state left by jobs on the old image, such as a CMake cache pointing at a tool that has since moved, never carries over to the new one. Stopping a container cancels any job its runner is running. A runner added before homerunner gave runners work volumes still keeps its old `_work` in its home volume, hidden under the new work volume but still taking up space, until it's removed and added again.
 
 To remove the runner `<NAME>` from the host, run:
 
@@ -52,7 +52,7 @@ To remove the runner `<NAME>` from the host, run:
 homerunner remove <NAME>
 ```
 
-It stops the runner's container, then removes the container and the volume, along with the runner's build state. The runner stays registered on GitHub, showing as offline, until you remove it from the runner settings of its repository or organization, or until a runner added later under the same name replaces it.
+It stops the runner's container, then removes the container and both volumes, along with the runner's build state. The runner stays registered on GitHub, showing as offline, until you remove it from the runner settings of its repository or organization, or until a runner added later under the same name replaces it.
 
 ## Setup
 
